@@ -172,30 +172,18 @@ def kadane_worst_segment(scores: List[int]) -> Tuple[int, Tuple[int, int]]:
 # --------------------------
 
 def word_break_one(s: str, dictionary: Set[str]) -> Optional[List[str]]:
-    """
-    Return ONE valid segmentation (list of words) for s using a DP approach,
-    or None if not segmentable under the given dictionary.
-    """
     n = len(s)
     dp: List[Optional[List[str]]] = [None] * (n + 1)
     dp[0] = []
-
     for i in range(1, n + 1):
         for j in range(i):
             if dp[j] is not None and s[j:i] in dictionary:
                 dp[i] = dp[j] + [s[j:i]]
-                break  # stop at the first valid split
-
+                break
     return dp[n]
 
-
 def word_break_all(s: str, dictionary: Set[str], max_paths: int = 20) -> List[List[str]]:
-    """
-    Return up to max_paths different valid segmentations (backtracking with memo).
-    Careful: the number of segmentations can explode; we cap it.
-    """
     from functools import lru_cache
-
     @lru_cache(None)
     def backtrack(i: int) -> List[List[str]]:
         if i == len(s):
@@ -210,5 +198,34 @@ def word_break_all(s: str, dictionary: Set[str], max_paths: int = 20) -> List[Li
                         break
                     ans.append([w] + t)
         return ans
-
     return backtrack(0)[:max_paths]
+
+def word_break_with_punct(s: str, dictionary: Set[str], all_solutions: bool = False, max_paths: int = 20):
+    tokens = re.findall(r"[a-zA-Z0-9]+|[^a-zA-Z0-9]", s)
+    results = []
+
+    for tok in tokens:
+        if tok.isalnum():
+            if all_solutions:
+                segs = word_break_all(tok.lower(), dictionary, max_paths=max_paths)
+                results.append([" ".join(seg) for seg in segs] if segs else [tok])
+            else:
+                seg = word_break_one(tok.lower(), dictionary)
+                results.append([" ".join(seg)] if seg else [tok])
+        else:
+            results.append([tok])  # keep punctuation
+
+    def combine(seq):
+        out = seq[0]
+        for chunk in seq[1:]:
+            new_out = []
+            for a in out:
+                for b in chunk:
+                    if re.match(r"^[a-zA-Z0-9]", b):
+                        new_out.append(a + " " + b)
+                    else:
+                        new_out.append(a + b)
+            out = new_out
+        return out
+
+    return combine(results)

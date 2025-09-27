@@ -155,6 +155,43 @@ def word_break_all(s: str, dictionary: Set[str], max_paths: int = 20) -> List[Li
 
     return backtrack(0)[:max_paths]
 
+def word_break_with_punct(
+    s: str,
+    dictionary: Set[str],
+    all_solutions: bool = False,
+    max_paths: int = 20
+) -> List[str]:
+    """
+    Segment alphanumeric chunks with word-break; keep punctuation; 
+    recombine with no space before punctuation. Returns a list of strings.
+    """
+    tokens = re.findall(r"[a-zA-Z0-9]+|[^a-zA-Z0-9]", s)  # words + punctuation
+    parts: List[List[str]] = []
+
+    for tok in tokens:
+        if tok.isalnum():
+            if all_solutions:
+                segs = word_break_all(tok.lower(), dictionary, max_paths=max_paths)
+                parts.append([" ".join(seg) for seg in segs] if segs else [tok])
+            else:
+                seg = word_break_one(tok.lower(), dictionary)
+                parts.append([" ".join(seg)] if seg else [tok])
+        else:
+            parts.append([tok])  # keep punctuation as-is
+
+    # recombine → add space before words, not before punctuation
+    out = parts[0] if parts else [""]
+    for chunk in parts[1:]:
+        new_out = []
+        for a in out:
+            for b in chunk:
+                if re.match(r"^[a-zA-Z0-9]", b):   # next part starts with letter/number
+                    new_out.append(a + " " + b)
+                else:  # punctuation
+                    new_out.append(a + b)
+        out = new_out
+    return out
+
 
 # =========================
 # Streamlit UI
@@ -340,29 +377,41 @@ with tab2:
 # ---------- Tab 3: Word-break ----------
 with tab3:
     st.subheader("Re-insert spaces into text with no spaces")
-    s = st.text_input("Input (e.g., thisisapen)")
-    st.caption("Dictionary: AFINN words by default, or upload your own .txt (one word per line).")
+    st.caption("Dictionary: uses AFINN + some common words by default, or upload your own .txt")
+
+    # Optional custom dictionary upload
     custom_dict = st.file_uploader("Optional custom dictionary", type=["txt"], key="dict_upl")
 
     if custom_dict:
         text = custom_dict.read().decode("utf-8", errors="ignore")
         DICT = {w.strip().lower() for w in text.splitlines() if w.strip()}
     else:
-        DICT = set(AFINN.keys())
+        # fallback = AFINN + some common English words
+        COMMON_WORDS = {"this", "is", "a", "the", "i", "am", "was", "and", "not", "very"}
+        DICT = set(AFINN.keys()) | COMMON_WORDS
 
-    colA, colB = st.columns(2)
-    with colA:
-        if st.button("Find ONE segmentation", key="one"):
-            seg = word_break_one(s.lower(), DICT)
-            if seg:
-                st.success(" ".join(seg))
+    # --- Streamlit form (pressing Enter triggers submit) ---
+    with st.form(key="wordbreak_form"):
+        s = st.text_input("Input (e.g., thisisapen)")
+        col1, col2 = st.columns(2)
+        with col1:
+            submit_one = st.form_submit_button("Show ONE segmentation")
+        with col2:
+            submit_many = st.form_submit_button("Show MANY segmentations (up to 20)")
+
+    # --- handle buttons ---
+    if s:
+        if submit_one:
+            outs = word_break_with_punct(s, DICT, all_solutions=False)
+            if outs:
+                st.success(outs[0])
             else:
                 st.error("No valid segmentation found.")
-    with colB:
-        if st.button("Find MANY segmentations (up to 20)", key="many"):
-            segs = word_break_all(s.lower(), DICT, max_paths=20)
-            if segs:
-                for i, path in enumerate(segs, 1):
-                    st.write(f"{i}. {' '.join(path)}")
+
+        if submit_many:
+            outs = word_break_with_punct(s, DICT, all_solutions=True, max_paths=20)
+            if outs:
+                for i, seg in enumerate(outs, 1):
+                    st.write(f"{i}. {seg}")
             else:
                 st.error("No valid segmentation found.")

@@ -8,9 +8,8 @@ import io
 import re
 import streamlit as st
 
-# =========================
-# Backend helpers
-# =========================
+
+# ---------- Backend helpers ----------
 
 def load_afinn(path_or_file) -> Dict[str, int]:
     """Load AFINN word->score dictionary from a path or an uploaded file."""
@@ -192,10 +191,7 @@ def word_break_with_punct(
         out = new_out
     return out
 
-
-# =========================
-# Streamlit UI
-# =========================
+# ---------- Streamlit UI ----------
 
 st.set_page_config(page_title="Sentiment Analysis (AFINN)", page_icon="🪄", layout="wide")
 st.title("🪄 Sentiment Analysis — AFINN Dictionary")

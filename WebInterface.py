@@ -223,12 +223,12 @@ with st.sidebar:
 
     k = st.number_input("Sliding window size (sentences)", min_value=1, max_value=20, value=3)
 
-tab1, tab2, tab3 = st.tabs(["Analyze CSV Reviews", "Analyze Free Text", "Word-Break (Space Reinsertion)"])
+tab1, tab2, tab3 = st.tabs(["Batch Review Analysis (CSV)", "Analyze Free Text", "Fix Spaceless Text (Word-Break)"])
 
 # ---------- Tab 1: CSV ----------
 with tab1:
     st.subheader("Upload CSV of Reviews")
-    csv_file = st.file_uploader("CSV file", type=["csv"], key="csv_upl")
+    csv_file = st.file_uploader("**Select a CSV file containing your reviews**", type=["csv"], key="csv_upl")
 
     if csv_file:
         # Read header with DictReader so we can pick the text column by name
@@ -302,8 +302,18 @@ with tab1:
 
             # ----- Display -----
             st.markdown("### 🌟 Sentence-level Extremes (across all reviews)")
-            st.write(f"**Most Positive Sentence:** `{overall_max[0]}`  (score **{overall_max[1]}**)")
-            st.write(f"**Most Negative Sentence:** `{overall_min[0]}`  (score **{overall_min[1]}**)")
+            st.markdown(
+                f"<span style='color:green; font-weight:bold'>Most Positive Sentence:</span> "
+                f"<span style='color:green'>{overall_max[0]}</span> "
+                f"<br><b>(score {overall_max[1]})</b>",
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f"<span style='color:red; font-weight:bold'>Most Negative Sentence:</span> "
+                f"<span style='color:red'>{overall_min[0]}</span> "
+                f"<br><b>(score {overall_min[1]})</b>",
+                unsafe_allow_html=True
+            )
 
             st.markdown(f"### 📏 Fixed-size Segment (window = {int(k)})")
             if best_fixed:
@@ -331,15 +341,16 @@ with tab1:
                 st.warning(txt)
 
     else:
-        st.caption("Tip: CSV must include a header row. Each row = one review/paragraph.")
+        st.caption("*Your CSV must have a header row (e.g., ‘review’). Each row should contain **one review** or **paragraph**.*")
 
 
 # ---------- Tab 2: Free text ----------
 with tab2:
-    st.subheader("Paste a Paragraph / Review")
-    text = st.text_area("Text", height=180, placeholder="Paste your review here…")
+    st.subheader("Paste or Type a Review Below")
+    text = st.text_area("**Your Review**", height=180, placeholder="e.g., The movie was fantastic but a little too long.")
+    st.markdown("**Tip: The more detail you provide, the more accurate the analysis will be.**")
 
-    if st.button("Analyze Text", type="primary", key="an_text"):
+    if st.button("Analyze My Sentiment", type="primary", key="an_text"):
         sentences, scores = score_paragraph(text, AFINN)
         if not sentences:
             st.warning("No sentences detected.")
@@ -376,28 +387,68 @@ with tab2:
 
 # ---------- Tab 3: Word-break ----------
 with tab3:
-    st.subheader("Re-insert spaces into text with no spaces")
-    st.caption("Dictionary: uses AFINN + some common words by default, or upload your own .txt")
+    st.subheader("Smart Word Separator")
+    st.markdown("By default, we use the AFINN dictionary plus common English words to detect natural breaks. You can also upload your own word list below.")
 
     # Optional custom dictionary upload
-    custom_dict = st.file_uploader("Optional custom dictionary", type=["txt"], key="dict_upl")
+    custom_dict = st.file_uploader("Add Your Own Dictionary (Optional)", type=["txt"], key="dict_upl")
+    st.caption("***Tip: Upload a `.txt` file with **one word per line** to improve segmentation accuracy.***")
+
 
     if custom_dict:
         text = custom_dict.read().decode("utf-8", errors="ignore")
         DICT = {w.strip().lower() for w in text.splitlines() if w.strip()}
     else:
         # fallback = AFINN + some common English words
-        COMMON_WORDS = {"this", "is", "a", "the", "i", "am", "was", "and", "not", "very"}
+        COMMON_WORDS = {
+        # Articles / determiners
+        "a", "an", "the", "this", "that", "these", "those",
+
+        # Pronouns
+        "i", "you", "he", "she", "it", "we", "they",
+        "me", "him", "her", "us", "them", "my", "your", "our", "their",
+
+        # Auxiliaries / linking verbs
+        "is", "am", "are", "was", "were", "be", "been", "being",
+
+        # Modals
+        "will", "would", "can", "could", "shall", "should", "may", "might", "must",
+
+        # Common verbs
+        "do", "does", "did", "have", "has", "had", "go", "went", "gone", "make", "made",
+        "say", "said", "get", "got", "see", "saw", "seen",
+
+        # Connectors
+        "and", "or", "but", "so", "because", "if", "when", "then",
+
+        # Negatives
+        "not", "no", "never", "nothing", "none", "nobody",
+
+        # Intensifiers
+        "very", "really", "too", "quite", "just",
+
+        # Common adverbs
+        "up", "down", "out", "in", "on", "off", "over", "under",
+
+        # Common adjectives
+        "good", "bad", "new", "old", "big", "small", "great",
+
+        # Misc fillers
+        "yes", "yeah", "okay", "ok", "oh", "well", "hmm"
+        }
+
         DICT = set(AFINN.keys()) | COMMON_WORDS
+
 
     # --- Streamlit form (pressing Enter triggers submit) ---
     with st.form(key="wordbreak_form"):
-        s = st.text_input("Input (e.g., thisisapen)")
+        s = st.text_input("**Paste Your Text Below**")
+        st.caption("***We will automatically figure out where the spaces should go.***")
         col1, col2 = st.columns(2)
         with col1:
-            submit_one = st.form_submit_button("Show ONE segmentation")
+            submit_one = st.form_submit_button("Find Best Segmentation")
         with col2:
-            submit_many = st.form_submit_button("Show MANY segmentations (up to 20)")
+            submit_many = st.form_submit_button("Explore All Possible Breaks (up to 20)")
 
     # --- handle buttons ---
     if s:

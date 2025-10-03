@@ -7,7 +7,9 @@ import csv
 import io
 import re
 import streamlit as st
-
+from collections import Counter
+from wordcloud import WordCloud, STOPWORDS
+import matplotlib.pyplot as plt
 
 # ---------- Backend helpers ----------
 
@@ -253,6 +255,8 @@ with tab1:
             best_any = None     # (sum, (a,b), seg_text, row_idx)
             worst_any = None
 
+            all_tokens: List[str] = []
+
             # rewind for the real pass
             text_io.seek(0)
             reader = csv.DictReader(text_io)
@@ -335,6 +339,60 @@ with tab1:
                 s, (a, b), txt, ridx = worst_any
                 st.write(f"**Most Negative Segment:** score **{s}**, review #{ridx}, sentences {a}–{b}")
                 st.warning(txt)
+            
+             # ----- Word Cloud over the whole dataset -----
+            st.markdown("### ☁️ Word Cloud — most frequent words")
+
+            # Re-scan the CSV to build sentiment-only weights
+            text_io.seek(0)
+            reader = csv.DictReader(text_io)
+
+            weights = Counter()   # weight per word = frequency × |AFINN score|
+            for row in reader:
+                review = (row.get(colname) or "").strip()
+                if not review:
+                    continue
+                for w in tokenize(review):
+                    if w in AFINN:
+                        weights[w] += abs(AFINN[w])   # add |score| for each occurrence
+
+            if not weights:
+                st.info("No AFINN sentiment words found in this column.")
+            else:
+                # split by polarity so it’s clearly “about AFINN”
+                pos = {w: v for w, v in weights.items() if AFINN[w] > 0}
+                neg = {w: v for w, v in weights.items() if AFINN[w] < 0}
+
+                col_pos, col_neg = st.columns(2)
+
+                # Positive cloud (green)
+                with col_pos:
+                    st.caption("**Positive words** (weighted by frequency × |score|)")
+                    if pos:
+                        wc_pos = WordCloud(width=540, height=420, background_color="white",
+                                        max_words=200).generate_from_frequencies(pos)
+                        wc_pos = wc_pos.recolor(color_func=lambda *a, **k: "hsl(140,80%,35%)")
+                        fig = plt.figure(figsize=(5.4, 4.2))
+                        plt.imshow(wc_pos, interpolation="bilinear"); plt.axis("off")
+                        st.pyplot(fig, clear_figure=True)
+                    else:
+                        st.info("No positive AFINN words.")
+
+                # Negative cloud (red)
+                with col_neg:
+                    st.caption("**Negative words** (weighted by frequency × |score|)")
+                    if neg:
+                        wc_neg = WordCloud(width=540, height=420, background_color="white",
+                                        max_words=200).generate_from_frequencies(neg)
+                        wc_neg = wc_neg.recolor(color_func=lambda *a, **k: "hsl(0,80%,45%)")
+                        fig = plt.figure(figsize=(5.4, 4.2))
+                        plt.imshow(wc_neg, interpolation="bilinear"); plt.axis("off")
+                        st.pyplot(fig, clear_figure=True)
+                    else:
+                        st.info("No negative AFINN words.")
+
+                
+                
 
     else:
         st.caption("*Your CSV must have a header row (e.g., ‘review’). Each row should contain **one review** or **paragraph**.*")

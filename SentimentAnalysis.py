@@ -7,9 +7,8 @@ Designed to work both from the CLI and inside Streamlit.
 from typing import List, Tuple, Dict, Optional, Set
 import re
 
-# --------------------------
-# Loading & tokenizing
-# --------------------------
+
+# ---------- Loading & tokenizing ----------
 
 def load_afinn(path_or_file) -> Dict[str, int]:
     """
@@ -47,15 +46,15 @@ def load_afinn(path_or_file) -> Dict[str, int]:
 
 def tokenize(sentence: str) -> List[str]:
     """
-    Convert a sentence into lowercase word tokens (letters + apostrophes).
     This is our 'cleaning' stage: it drops punctuation/emoji/numbers.
+    Convert a sentence into lowercase word tokens (letters + apostrophes). 
+    Making it case-insensitive (e.g. 'Happy' and 'happy')
     """
-    return re.findall(r"[a-zA-Z']+", sentence.lower())
+    return re.findall(r"[a-zA-Z']+", sentence.lower()) 
+    #''I LOVE this phone!' → ['i', 'love', 'this', 'phone'].
 
 
-# --------------------------
-# Sentence scoring
-# --------------------------
+# ---------- Sentence scoring ----------
 
 def score_sentence(sentence: str, afinn: Dict[str, int]) -> int:
     """
@@ -63,16 +62,20 @@ def score_sentence(sentence: str, afinn: Dict[str, int]) -> int:
     Tokens not in the dictionary contribute 0.
     """
     return sum(afinn.get(w, 0) for w in tokenize(sentence))
+    # love = +3, phone = 0 → total score = +3.
 
 
 def split_sentences(text: str) -> List[str]:
     """
     Naive sentence splitter:
     - Splits on '.', '!' or '?' followed by whitespace OR on line breaks.
+    - Splits on new lines (\n+) to handle multi-line input.
     - Trims whitespace and drops empty chunks.
     """
     parts = re.split(r"(?<=[.!?])\s+|\n+", text)
     return [p.strip() for p in parts if p.strip()]
+    # ‘This phone is great! Battery lasts long. Camera could be better.’ → Split into 3 separate sentences.
+
 
 
 def score_paragraph(text: str, afinn: Dict[str, int]) -> Tuple[List[str], List[int]]:
@@ -84,7 +87,7 @@ def score_paragraph(text: str, afinn: Dict[str, int]) -> Tuple[List[str], List[i
     sentences = split_sentences(text)
     scores = [score_sentence(s, afinn) for s in sentences]
     return sentences, scores
-
+    # One for the sentences and one for their sentiment scores
 
 def most_extreme_sentence(sentences: List[str], scores: List[int]):
     """
@@ -96,11 +99,9 @@ def most_extreme_sentence(sentences: List[str], scores: List[int]):
     max_i = max(range(len(scores)), key=lambda i: scores[i])
     min_i = min(range(len(scores)), key=lambda i: scores[i])
     return sentences[max_i], scores[max_i], sentences[min_i], scores[min_i]
+    #If our sentences have scores [3, -2, 1] → ‘most positive’ = sentence 1 (score 3), ‘most negative’ = sentence 2 (score -2).
 
-
-# --------------------------
-# Fixed-size sliding window
-# --------------------------
+# ---------- Fixed-size sliding window ----------
 
 def sliding_window_segments(scores: List[int], k: int):
     """
@@ -128,9 +129,7 @@ def sliding_window_segments(scores: List[int], k: int):
     return (max_sum, max_rng), (min_sum, min_rng)
 
 
-# --------------------------
-# Arbitrary-length segments
-# --------------------------
+# ---------- Arbitrary-length segments ----------
 
 def kadane_best_segment(scores: List[int]) -> Tuple[int, Tuple[int, int]]:
     """
@@ -167,9 +166,7 @@ def kadane_worst_segment(scores: List[int]) -> Tuple[int, Tuple[int, int]]:
     return -best_inv, (s, e)
 
 
-# --------------------------
-# Word-break (space reinsertion)
-# --------------------------
+# ---------- Word-break (space reinsertion) ----------
 
 def word_break_one(s: str, dictionary: Set[str]) -> Optional[List[str]]:
     n = len(s)

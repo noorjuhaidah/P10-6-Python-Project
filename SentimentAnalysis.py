@@ -31,11 +31,11 @@ def load_afinn(path_or_file) -> Dict[str, int]:
     for line in lines:
         if not line.strip():
             continue
-        # Each line looks like: word<TAB>score
+        # Each line looks like: word<TAB>score 
         parts = line.strip().split("\t")
         if len(parts) != 2:
             continue
-        word, score = parts
+        word, score = parts #{word: score}
         try:
             afinn[word] = int(score)
         except ValueError:
@@ -62,32 +62,33 @@ def score_sentence(sentence: str, afinn: Dict[str, int]) -> int:
     Tokens not in the dictionary contribute 0.
     """
     return sum(afinn.get(w, 0) for w in tokenize(sentence))
-    # love = +3, phone = 0 → total score = +3.
-
+    # love = +3, boring = −2,
+    # the sentence “I love it but it’s boring” → score of +1.((+3) + (-2) = +1)
 
 def split_sentences(text: str) -> List[str]:
     """
     Naive sentence splitter:
-    - Splits on '.', '!' or '?' followed by whitespace OR on line breaks.
-    - Splits on new lines (\n+) to handle multi-line input.
-    - Trims whitespace and drops empty chunks.
+    - (?<=[.!?]) is a lookbehind that means “split after a period, exclamation mark, or question mark.”
+    - \s+ means one or more spaces.
+    - |\n+ adds an “OR” condition, allowing splits on newline characters.
     """
     parts = re.split(r"(?<=[.!?])\s+|\n+", text)
     return [p.strip() for p in parts if p.strip()]
     # ‘This phone is great! Battery lasts long. Camera could be better.’ → Split into 3 separate sentences.
 
 
-
 def score_paragraph(text: str, afinn: Dict[str, int]) -> Tuple[List[str], List[int]]:
     """
     Given a paragraph/review, return:
       - sentences: list of sentence strings
-      - scores:    list of integer sentiment scores, aligned by index
+      - scores: list of integer sentiment scores, aligned by index
     """
     sentences = split_sentences(text)
     scores = [score_sentence(s, afinn) for s in sentences]
     return sentences, scores
-    # One for the sentences and one for their sentiment scores
+    # text = "I love this movie. It is fantastic!" , afinn = {"love": 3, "fantastic": 4}
+    #["I love this movie.", "It is fantastic!"], [3, 4]
+
 
 def most_extreme_sentence(sentences: List[str], scores: List[int]):
     """
